@@ -4,7 +4,8 @@ import type { Place } from '../place.model';
 import { PlacesComponent } from '../places.component';
 import { PlacesContainerComponent } from '../places-container/places-container.component';
 import { HttpClient } from '@angular/common/http';
-import { map } from 'rxjs';
+import { catchError, map, throwError } from 'rxjs';
+import { PlacesService } from '../places.service';
 
 @Component({
   selector: 'app-available-places',
@@ -18,27 +19,36 @@ export class AvailablePlacesComponent implements OnInit {
   isFetching = signal(false);
   error = signal('');
 
-  private httpClient = inject(HttpClient);
+  private placesServices = inject(PlacesService);
   private destroyRef = inject(DestroyRef);
+  private httpClient = inject(HttpClient);
 
   ngOnInit(): void {
     this.isFetching.set(true);
-    const subscription = this.httpClient
-      .get<{ places: Place[] }>('http://localhost:3000/places')
-      .pipe(map((resData) => resData.places))
-      .subscribe({
-        next: (places) => {
-          this.places.set(places);
-        },
-        error: (err) => {
-          this.error.set(err);
-        },
-        complete: () => {
-          this.isFetching.set(false);
-        },
-      });
+    const subscription = this.placesServices.loadAvailablePlaces().subscribe({
+      next: (places) => {
+        this.places.set(places);
+      },
+      error: (err: Error) => {
+        console.log(err);
+        this.error.set(err.message);
+      },
+      complete: () => {
+        this.isFetching.set(false);
+      },
+    });
     this.destroyRef.onDestroy(() => {
       subscription.unsubscribe();
     });
+  }
+
+  onSelectPlace(selectedPace: Place) {
+    this.httpClient
+      .put('http://localhost:3000/user-places', {
+        placeId: selectedPace.id,
+      })
+      .subscribe({
+        next: (resData) => console.log(resData),
+      });
   }
 }
